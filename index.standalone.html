@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeltaStock Protocol — Delta-Neutral Yield on Tokenized Equities & RWAs</title>
+  <meta name="description" content="Earn DEX trading fees on tokenized equities hedged with perpetual shorts. Zero price exposure, maximum real yield on DeltaStock Protocol.">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              accent: '#00E676',
+              cyan: '#00E5FF',
+              dark: '#0B0E14',
+              card: '#121824',
+              cardBorder: '#1E293B'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'monospace']
+          },
+          animation: {
+            'marquee': 'marquee 30s linear infinite'
+          },
+          keyframes: {
+            marquee: {
+              '0%': { transform: 'translateX(0%)' },
+              '100%': { transform: 'translateX(-50%)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- React 18 & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #0B0E14;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0E14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 4px;
+    }
+    .glass-panel {
+      background: rgba(18, 24, 36, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-panel-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-panel-hover:hover {
+      background: rgba(26, 34, 50, 0.9);
+      border-color: rgba(0, 230, 118, 0.3);
+      box-shadow: 0 10px 30px -10px rgba(0, 230, 118, 0.15);
+      transform: translateY(-2px);
+    }
+    .bg-radial-gradient {
+      background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.15) 0%, rgba(0, 229, 255, 0.05) 35%, transparent 70%);
+    }
+    .text-gradient-emerald {
+      background: linear-gradient(135deg, #00E676 0%, #00E5FF 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-[#0B0E14] text-slate-100 font-sans antialiased selection:bg-[#00E676] selection:text-black min-h-screen overflow-x-hidden">
+  
+  <div id="root"></div>
+
+  <!-- React Application Code -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Mock Data
+    const TICKERS = [
+      { symbol: 'NVDA', name: 'NVIDIA Corp', price: 128.50, change24h: 3.42, deltaApy: 31.8, icon: '⚡' },
+      { symbol: 'TSLA', name: 'Tesla Inc', price: 218.40, change24h: -1.85, deltaApy: 28.4, icon: '🚗' },
+      { symbol: 'SPY', name: 'S&P 500 ETF', price: 542.10, change24h: 0.54, deltaApy: 18.2, icon: '🏛️' },
+      { symbol: 'AAPL', name: 'Apple Inc', price: 224.30, change24h: 1.12, deltaApy: 21.5, icon: '🍏' },
+      { symbol: 'QQQ', name: 'Nasdaq 100 ETF', price: 478.90, change24h: 1.45, deltaApy: 22.9, icon: '📈' },
+      { symbol: 'GME', name: 'GameStop Corp', price: 22.15, change24h: -4.20, deltaApy: 54.6, icon: '🎮' },
+      { symbol: 'MSFT', name: 'Microsoft Corp', price: 448.20, change24h: 0.88, deltaApy: 19.8, icon: '💻' },
+      { symbol: 'AMZN', name: 'Amazon.com Inc', price: 186.70, change24h: 2.10, deltaApy: 24.1, icon: '📦' },
+      { symbol: 'META', name: 'Meta Platforms', price: 512.60, change24h: -0.92, deltaApy: 26.7, icon: '♾️' },
+      { symbol: 'PLTR', name: 'Palantir Tech', price: 29.40, change24h: 5.15, deltaApy: 39.2, icon: '👁️' }
+    ];
+
+    const STRATEGIES = [
+      {
+        id: 'nvda-delta-v1',
+        name: 'NVIDIA Delta-Neutral Vault',
+        assetSymbol: 'NVDA',
+        assetName: 'NVIDIA Corporation',
+        category: 'Tech Sector',
+        lpVenue: 'Uniswap V3 (Concentrated)',
+        perpVenue: 'Hyperliquid Perps',
+        tvl: 18450000,
+        estApy: 31.8,
+        feeApy: 36.2,
+        hedgeCostApy: -4.4,
+        volume24h: 42100000,
+        rebalanceBand: '±8.5%',
+        deltaVariance: '0.14%',
+        status: 'High Volume'
+      },
+      {
+        id: 'spy-delta-v1',
+        name: 'S&P 500 Index Hedged Yield',
+        assetSymbol: 'SPY',
+        assetName: 'SPDR S&P 500 ETF Trust',
+        category: 'Index ETF',
+        lpVenue: 'Camelot V3 CLMM',
+        perpVenue: 'GMX V2 Perps',
+        tvl: 29800000,
+        estApy: 18.2,
+        feeApy: 20.8,
+        hedgeCostApy: -2.6,
+        volume24h: 58900000,
+        rebalanceBand: '±12.0%',
+        deltaVariance: '0.05%',
+        status: 'Active'
+      },
+      {
+        id: 'tsla-delta-v1',
+        name: 'Tesla Dynamic Hedge Vault',
+        assetSymbol: 'TSLA',
+        assetName: 'Tesla Inc',
+        category: 'High Yield',
+        lpVenue: 'Aerodrome Slipstream',
+        perpVenue: 'Synthetix Perps V3',
+        tvl: 14200000,
+        estApy: 28.4,
+        feeApy: 34.1,
+        hedgeCostApy: -5.7,
+        volume24h: 28700000,
+        rebalanceBand: '±10.0%',
+        deltaVariance: '0.22%',
+        status: 'Optimizing'
+      },
+      {
+        id: 'qqq-delta-v1',
+        name: 'Nasdaq 100 Core Vault',
+        assetSymbol: 'QQQ',
+        assetName: 'Invesco QQQ Trust',
+        category: 'Index ETF',
+        lpVenue: 'Uniswap V3',
+        perpVenue: 'dYdX V4',
+        tvl: 22100000,
+        estApy: 22.9,
+        feeApy: 26.0,
+        hedgeCostApy: -3.1,
+        volume24h: 49200000,
+        rebalanceBand: '±10.0%',
+        deltaVariance: '0.08%',
+        status: 'Active'
+      },
+      {
+        id: 'aapl-delta-v1',
+        name: 'Apple Safe Harbor Vault',
+        assetSymbol: 'AAPL',
+        assetName: 'Apple Inc',
+        category: 'High-Cap',
+        lpVenue: 'PancakeSwap V3',
+        perpVenue: 'Hyperliquid Perps',
+        tvl: 16900000,
+        estApy: 21.5,
+        feeApy: 24.3,
+        hedgeCostApy: -2.8,
+        volume24h: 34500000,
+        rebalanceBand: '±10.0%',
+        deltaVariance: '0.07%',
+        status: 'Active'
+      },
+      {
+        id: 'gme-delta-v1',
+        name: 'GameStop High-Vol Delta',
+        assetSymbol: 'GME',
+        assetName: 'GameStop Corp',
+        category: 'High Yield',
+        lpVenue: 'Raydium CLMM',
+        perpVenue: 'Drift Perps',
+        tvl: 7800000,
+        estApy: 54.6,
+        feeApy: 68.2,
+        hedgeCostApy: -13.6,
+        volume24h: 19400000,
+        rebalanceBand: '±6.0%',
+        deltaVariance: '0.45%',
+        status: 'High Volume'
+      }
+    ];
+
+    const PROPOSALS = [
+      {
+        id: 'dip-14',
+        number: 'DIP-14',
+        title: 'Deploy $5M Treasury Reserve into NVDA Delta-Neutral Vault',
+        category: 'Treasury Allocation',
+        status: 'Active',
+        forVotes: 8420000,
+        againstVotes: 310000,
+        endsInDays: 2,
+        description: 'Authorize the DeltaStock DAO treasury to allocate 5,000,000 USDC into the high-performing NVDA Delta-Neutral Vault to compound trading fee yield directly into the governance staking pool.'
+      },
+      {
+        id: 'dip-13',
+        number: 'DIP-13',
+        title: 'Adjust Delta Re-balance Threshold for Tech RWAs to ±8.5%',
+        category: 'Risk Management',
+        status: 'Passed',
+        forVotes: 12100000,
+        againstVotes: 980000,
+        endsInDays: 0,
+        description: 'Tighten the automated keeper rebalance band for high-beta tech equities from ±10% to ±8.5% to minimize residual curvature slippage during earnings volatility.'
+      }
+    ];
+
+    // Main App Component
+    function App() {
+      // Wallet state
+      const [wallet, setWallet] = useState({
+        isConnected: false,
+        address: null,
+        usdcBalance: 12500,
+        dskBalance: 4500,
+        stakedDsk: 2000
+      });
+
+      // Interactive States
+      const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+      const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+      const [selectedStrategy, setSelectedStrategy] = useState(STRATEGIES[0]);
+      
+      // Payoff Simulator State
+      const [priceMovePercent, setPriceMovePercent] = useState(0);
+
+      // Category Filter State
+      const [selectedCategory, setSelectedCategory] = useState('All');
+
+      // Calculator State
+      const [calcDeposit, setCalcDeposit] = useState(10000);
+      const [calcVaultId, setCalcVaultId] = useState(STRATEGIES[0].id);
+      const [calcMonths, setCalcMonths] = useState(12);
+      const [calcCrash, setCalcCrash] = useState(-15);
+
+      // Staking Tab State
+      const [daoTab, setDaoTab] = useState('treasury');
+      const [stakeInput, setStakeInput] = useState('');
+      const [userVotes, setUserVotes] = useState({});
+
+      // Deposit Modal Execution State
+      const [depositInput, setDepositInput] = useState('1000');
+      const [isExecuting, setIsExecuting] = useState(false);
+      const [isSuccess, setIsSuccess] = useState(false);
+
+      // Helper Calculations for Payoff Visualizer
+      const baseValue = 10000;
+      const lpVal = baseValue * (1 + (priceMovePercent / 100) * 0.5 - Math.pow(priceMovePercent / 100, 2) * 0.15);
+      const shortVal = baseValue - (lpVal - baseValue);
+      const residualVar = Math.pow(priceMovePercent / 100, 2) * 0.08 * 100;
+      const netVal = baseValue * (1 - (residualVar / 100));
+
+      // Calculator Calculations
+      const currentCalcVault = STRATEGIES.find(s => s.id === calcVaultId) || STRATEGIES[0];
+      const yearFrac = calcMonths / 12;
+      const deltaYield = calcDeposit * (currentCalcVault.estApy / 100) * yearFrac;
+      const deltaTotal = calcDeposit + deltaYield;
+      const unhedgedLoss = calcDeposit * (calcCrash / 100) * 0.7;
+      const unhedgedFee = calcDeposit * (currentCalcVault.feeApy / 100) * yearFrac;
+      const unhedgedTotal = Math.max(0, calcDeposit + unhedgedLoss + unhedgedFee);
+      const buyHoldTotal = calcDeposit * (1 + calcCrash / 100);
+
+      // Handlers
+      const handleConnect = () => {
+        setWallet({
+          isConnected: true,
+          address: '0x71C...4e89',
+          usdcBalance: 12500,
+          dskBalance: 4500,
+          stakedDsk: 2000
+        });
+        setIsWalletModalOpen(false);
+      };
+
+      const handleDisconnect = () => {
+        setWallet({
+          isConnected: false,
+          address: null,
+          usdcBalance: 0,
+          dskBalance: 0,
+          stakedDsk: 0
+        });
+        setIsWalletModalOpen(false);
+      };
+
+      const handleOpenDeposit = (strat) => {
+        setSelectedStrategy(strat);
+        setIsDepositModalOpen(true);
+      };
+
+      const handleExecuteDeposit = () => {
+        if (!wallet.isConnected) {
+          setIsWalletModalOpen(true);
+          return;
+        }
+        setIsExecuting(true);
+        setTimeout(() => {
+          setIsExecuting(false);
+          setIsSuccess(true);
+        }, 1500);
+      };
+
+      const filteredStrategies = selectedCategory === 'All'
+        ? STRATEGIES
+        : STRATEGIES.filter(s => s.category === selectedCategory);
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          
+          {/* NAVBAR */}
+          <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#0B0E14]/80 backdrop-blur-xl">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+              
+              {/* Logo */}
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00E676] to-[#00E5FF] p-0.5 shadow-lg shadow-[#00E676]/20">
+                  <div className="w-full h-full bg-[#0B0E14] rounded-[10px] flex items-center justify-center font-mono font-extrabold text-xl text-[#00E676]">
+                    Δ
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-extrabold text-xl tracking-tight text-white flex items-center gap-1">
+                    DeltaStock<span className="text-[#00E676]">.fi</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400 -mt-1 tracking-widest uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse"></span> Delta-Neutral RWAs
+                  </span>
+                </div>
+              </div>
+
+              {/* Nav Links */}
+              <nav className="hidden md:flex items-center space-x-6 text-sm font-medium text-slate-300">
+                <a href="#visualizer" className="hover:text-white transition-colors">Payoff Mechanics</a>
+                <a href="#strategies" className="hover:text-white transition-colors">Vault Strategies</a>
+                <a href="#calculator" className="hover:text-white transition-colors">Yield Calculator</a>
+                <a href="#treasury" className="hover:text-white transition-colors flex items-center gap-1.5">
+                  DAO & $DSK
+                  <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#00E676]/20 text-[#00E676] rounded">50% Share</span>
+                </a>
+              </nav>
+
+              {/* Connect Wallet */}
+              <button
+                onClick={() => setIsWalletModalOpen(true)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-mono text-sm transition-all duration-200 shadow-lg ${
+                  wallet.isConnected
+                    ? 'bg-slate-900 border border-[#00E676]/50 text-[#00E676]'
+                    : 'bg-gradient-to-r from-[#00E676] to-[#00C853] text-black font-extrabold hover:shadow-[#00E676]/30'
+                }`}
+              >
+                <span>{wallet.isConnected ? wallet.address : 'Connect Wallet'}</span>
+              </button>
+
+            </div>
+          </header>
+
+          {/* HERO SECTION */}
+          <section className="relative pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden bg-radial-gradient">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+              
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-[#00E676]/30 backdrop-blur-md text-xs font-mono text-slate-200 mb-6">
+                <span className="w-2 h-2 rounded-full bg-[#00E676] animate-ping"></span>
+                <span className="text-[#00E676] font-bold">Delta-Neutral Protocol</span>
+                <span>•</span>
+                <span>Automated Perpetuals Hedging Engine</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
+                Earn the fees,<br />
+                <span className="text-gradient-emerald">not the price.</span>
+              </h1>
+
+              <p className="mt-6 text-lg sm:text-xl text-slate-300 font-normal leading-relaxed max-w-2xl mx-auto">
+                Tokenized equities (NVDA, TSLA, SPY) generate massive DEX trading fees. 
+                Providing liquidity normally means taking price directional risk. 
+                <strong className="text-white font-semibold"> We hedge the stock away with short perps</strong> and compound the fees straight to your wallet.
+              </p>
+
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                  onClick={() => setIsDepositModalOpen(true)}
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#00E676] to-[#00C853] text-black font-extrabold text-base hover:shadow-xl hover:shadow-[#00E676]/30 transition-all"
+                >
+                  Explore Vault Strategies →
+                </button>
+                <a
+                  href="#visualizer"
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white font-semibold text-base hover:bg-slate-800 transition-all"
+                >
+                  How Delta-Neutral Works
+                </a>
+              </div>
+
+              {/* Stats Bar */}
+              <div className="mt-16 pt-10 border-t border-slate-800/80 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="p-4 rounded-2xl glass-panel text-center">
+                  <div className="text-xs font-mono uppercase text-slate-400">Indexed RWA Assets</div>
+                  <div className="text-3xl font-extrabold font-mono text-white mt-1">182</div>
+                </div>
+                <div className="p-4 rounded-2xl glass-panel text-center">
+                  <div className="text-xs font-mono uppercase text-slate-400">Vault Liquidity (TVL)</div>
+                  <div className="text-3xl font-extrabold font-mono text-[#00E676] mt-1">$84.5M</div>
+                </div>
+                <div className="p-4 rounded-2xl glass-panel text-center">
+                  <div className="text-xs font-mono uppercase text-slate-400">24h Trading Volume</div>
+                  <div className="text-3xl font-extrabold font-mono text-white mt-1">$162.4M</div>
+                </div>
+                <div className="p-4 rounded-2xl glass-panel text-center">
+                  <div className="text-xs font-mono uppercase text-slate-400">Average Hedged APY</div>
+                  <div className="text-3xl font-extrabold font-mono text-[#00E5FF] mt-1">24.8%</div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* TICKER MARQUEE */}
+          <div className="w-full bg-[#0E131F] border-y border-slate-800/80 py-3.5 overflow-hidden relative">
+            <div className="flex w-max animate-marquee space-x-6">
+              {[...TICKERS, ...TICKERS].map((t, idx) => (
+                <div key={`${t.symbol}-${idx}`} className="flex items-center space-x-3 px-4 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
+                  <span>{t.icon}</span>
+                  <span className="font-bold text-white">{t.symbol}</span>
+                  <span className="text-slate-300">${t.price.toFixed(2)}</span>
+                  <span className={t.change24h >= 0 ? 'text-[#00E676]' : 'text-rose-400'}>
+                    {t.change24h >= 0 ? '+' : ''}{t.change24h}%
+                  </span>
+                  <span className="text-[#00E5FF] font-bold">⚡ {t.deltaApy}% APY</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PAYOFF VISUALIZER SECTION */}
+          <section id="visualizer" className="py-20 bg-[#0B0E14] relative">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              
+              <div className="text-center max-w-3xl mx-auto">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/10 border border-[#00E676]/30 text-[#00E676] text-xs font-mono font-bold mb-3">
+                  Interactive Mathematical Mechanics
+                </div>
+                <h2 className="text-3xl sm:text-5xl font-extrabold text-white">
+                  How the position stays <span className="text-gradient-emerald">Delta-Neutral</span>
+                </h2>
+                <p className="mt-3 text-slate-300 text-base">
+                  Two legs, opened together and continuously rebalanced.
+                </p>
+              </div>
+
+              {/* Slider Box */}
+              <div className="mt-10 max-w-2xl mx-auto p-6 rounded-2xl glass-panel border border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-slate-200">Simulate Stock Price Shift:</span>
+                  <span className="font-mono text-base font-extrabold text-[#00E676]">
+                    {priceMovePercent > 0 ? `+${priceMovePercent}%` : `${priceMovePercent}%`}
+                  </span>
+                </div>
+                <input
+                  type="range" min="-20" max="20" step="1"
+                  value={priceMovePercent}
+                  onChange={(e) => setPriceMovePercent(parseFloat(e.target.value))}
+                  className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#00E676]"
+                />
+                <div className="flex justify-between text-xs font-mono text-slate-400 mt-2">
+                  <span>-20% Crash</span>
+                  <span className="text-[#00E676] font-bold">Entry Price (0%)</span>
+                  <span>+20% Surge</span>
+                </div>
+              </div>
+
+              {/* 3 Panels */}
+              <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <div className="p-6 rounded-2xl glass-panel border border-slate-800">
+                  <div className="text-xs font-mono text-amber-400 font-bold uppercase">Leg 1: Concentrated LP</div>
+                  <h3 className="text-lg font-bold text-white mt-1">DEX Spot Pool</h3>
+                  <div className="my-6 h-36 bg-slate-950 rounded-xl p-2 flex items-center justify-center border border-slate-900">
+                    <svg viewBox="0 0 200 100" className="w-full h-full">
+                      <path d="M 10,85 Q 100,45 190,15" fill="none" stroke="#F59E0B" strokeWidth="3"/>
+                      <circle cx={100 + (priceMovePercent * 4.5)} cy={50 - (priceMovePercent * 1.8)} r="6" fill="#F59E0B"/>
+                    </svg>
+                  </div>
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-400">LP Spot Value:</span>
+                    <span className="text-amber-400 font-bold">${lpVal.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-2xl glass-panel border border-slate-800">
+                  <div className="text-xs font-mono text-[#00E5FF] font-bold uppercase">Leg 2: Perpetual Short</div>
+                  <h3 className="text-lg font-bold text-white mt-1">Short Contract Hedge</h3>
+                  <div className="my-6 h-36 bg-slate-950 rounded-xl p-2 flex items-center justify-center border border-slate-900">
+                    <svg viewBox="0 0 200 100" className="w-full h-full">
+                      <path d="M 10,15 Q 100,55 190,85" fill="none" stroke="#00E5FF" strokeWidth="3"/>
+                      <circle cx={100 + (priceMovePercent * 4.5)} cy={50 + (priceMovePercent * 1.8)} r="6" fill="#00E5FF"/>
+                    </svg>
+                  </div>
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-400">Short Position Value:</span>
+                    <span className="text-[#00E5FF] font-bold">${shortVal.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-2xl glass-panel border border-[#00E676]/40 bg-[#00E676]/5">
+                  <div className="text-xs font-mono text-[#00E676] font-bold uppercase">Result: Combined Flat</div>
+                  <h3 className="text-lg font-bold text-white mt-1">Pure Fee Capture</h3>
+                  <div className="my-6 h-36 bg-slate-950 rounded-xl p-2 flex items-center justify-center border border-[#00E676]/30">
+                    <svg viewBox="0 0 200 100" className="w-full h-full">
+                      <line x1="10" y1="50" x2="190" y2="50" stroke="#00E676" strokeWidth="4"/>
+                      <circle cx={100 + (priceMovePercent * 4.5)} cy="50" r="7" fill="#00E676"/>
+                    </svg>
+                  </div>
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300">Net Portfolio Value:</span>
+                    <span className="text-white font-bold">${netVal.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </section>
+
+          {/* VAULT STRATEGIES MARKETPLACE */}
+          <section id="strategies" className="py-20 bg-[#0E131F] border-t border-slate-800/80">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                  <div className="text-xs font-mono text-[#00E5FF] font-bold uppercase mb-2">High Yield Vaults</div>
+                  <h2 className="text-3xl sm:text-5xl font-extrabold text-white">
+                    Delta-Neutral <span className="text-gradient-emerald">Vault Strategies</span>
+                  </h2>
+                </div>
+
+                <div className="flex gap-2">
+                  {['All', 'Tech Sector', 'Index ETF', 'High Yield'].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                        selectedCategory === cat ? 'bg-[#00E676] text-black' : 'bg-slate-900 text-slate-400'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {filteredStrategies.map((s) => (
+                  <div key={s.id} className="p-6 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between text-xs font-mono text-slate-400">
+                        <span>{s.category}</span>
+                        <span className="text-[#00E676] font-bold">{s.status}</span>
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-mono font-bold text-white text-lg">
+                          {s.assetSymbol}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white text-lg">{s.name}</h3>
+                          <p className="text-xs text-slate-400 font-mono">{s.assetName}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 p-4 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-baseline font-mono">
+                        <span className="text-xs text-slate-400">Net Est APY:</span>
+                        <span className="text-3xl font-extrabold text-[#00E676]">+{s.estApy}%</span>
+                      </div>
+
+                      <div className="mt-4 space-y-1.5 text-xs font-mono text-slate-400">
+                        <div className="flex justify-between">
+                          <span>TVL:</span>
+                          <span className="text-white font-bold">${(s.tvl / 1000000).toFixed(2)}M USDC</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Spot LP Venue:</span>
+                          <span className="text-slate-300">{s.lpVenue}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Perp Short Venue:</span>
+                          <span className="text-[#00E5FF]">{s.perpVenue}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleOpenDeposit(s)}
+                      className="mt-6 w-full py-3 rounded-xl bg-[#00E676] text-black font-extrabold text-sm hover:shadow-lg hover:shadow-[#00E676]/20 transition-all"
+                    >
+                      Deposit & Earn Yield →
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </section>
+
+          {/* YIELD CALCULATOR */}
+          <section id="calculator" className="py-20 bg-[#0B0E14]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              
+              <div className="text-center max-w-2xl mx-auto mb-10">
+                <div className="text-xs font-mono text-[#00E676] font-bold uppercase mb-2">ROI Calculator</div>
+                <h2 className="text-3xl sm:text-5xl font-extrabold text-white">
+                  Calculate Your <span className="text-gradient-emerald">Hedged Fee Earnings</span>
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <div className="lg:col-span-5 p-6 rounded-2xl glass-panel border border-slate-800 space-y-6">
+                  <div>
+                    <label className="text-xs font-mono text-slate-400 block mb-2">Deposit Amount (USDC):</label>
+                    <input
+                      type="number" value={calcDeposit}
+                      onChange={(e) => setCalcDeposit(Math.max(100, parseFloat(e.target.value) || 0))}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xl font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-mono text-slate-400 block mb-2">Select Vault Strategy:</label>
+                    <select
+                      value={calcVaultId} onChange={(e) => setCalcVaultId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm"
+                    >
+                      {STRATEGIES.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.estApy}% APY)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-mono text-slate-400 block mb-2">Market Crash Stress Test:</label>
+                    <div className="flex justify-between text-xs font-mono text-rose-400 mb-1">
+                      <span>Simulated Stock Price Drop:</span>
+                      <span>{calcCrash}%</span>
+                    </div>
+                    <input
+                      type="range" min="-40" max="20" step="5" value={calcCrash}
+                      onChange={(e) => setCalcCrash(parseInt(e.target.value))}
+                      className="w-full h-2 bg-slate-800 rounded-lg accent-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="p-6 rounded-2xl glass-panel border border-[#00E676]/50 bg-[#00E676]/10">
+                    <div className="text-xs font-mono text-[#00E676] font-bold uppercase">DeltaStock Strategy (Hedged)</div>
+                    <div className="mt-2 flex justify-between items-baseline">
+                      <div className="text-4xl font-extrabold font-mono text-[#00E676]">
+                        ${deltaTotal.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-sm font-mono text-white font-bold">
+                        +${deltaYield.toLocaleString('en-US', { maximumFractionDigits: 2 })} Net Yield
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-300">
+                      ✅ Stock price drop ({calcCrash}%) was completely hedged out. Principal preserved + fee yield captured.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl glass-panel border border-slate-800">
+                    <div className="flex justify-between text-xs font-mono text-slate-400">
+                      <span>Unhedged DEX LP (Without Short):</span>
+                      <span className="text-amber-400">${unhedgedTotal.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-5 rounded-2xl glass-panel border border-slate-800">
+                    <div className="flex justify-between text-xs font-mono text-slate-400">
+                      <span>Direct Stock Holding:</span>
+                      <span className="text-rose-400">${buyHoldTotal.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </section>
+
+          {/* DAO TREASURY & STAKING */}
+          <section id="treasury" className="py-20 bg-[#0E131F] border-t border-slate-800/80">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              
+              <div className="text-xs font-mono text-[#00E5FF] font-bold uppercase mb-2">On-Chain Governance</div>
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-white">
+                DAO Treasury & <span className="text-gradient-emerald">$DSK Staking</span>
+              </h2>
+              <p className="mt-3 text-slate-300 text-base max-w-xl mx-auto">
+                50% of protocol performance fees are distributed weekly to $DSK governance stakers.
+              </p>
+
+              <div className="mt-10 p-8 rounded-2xl glass-panel border border-[#00E676]/40 max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="text-left">
+                  <div className="text-xs font-mono text-slate-400">DAO Treasury Reserve:</div>
+                  <div className="text-4xl font-extrabold font-mono text-white">$14,850,240 USDC</div>
+                  <div className="text-xs text-[#00E676] mt-1">Weekly Profit Pool: $142,500 USDC</div>
+                </div>
+
+                <button
+                  onClick={() => setIsWalletModalOpen(true)}
+                  className="px-6 py-3.5 rounded-xl bg-[#00E676] text-black font-extrabold text-sm hover:shadow-lg hover:shadow-[#00E676]/20 transition-all"
+                >
+                  Stake $DSK & Earn Dividends →
+                </button>
+              </div>
+
+            </div>
+          </section>
+
+          {/* FOOTER */}
+          <footer className="bg-[#080B10] border-t border-slate-800/80 py-10 text-center text-xs font-mono text-slate-500">
+            <div className="max-w-7xl mx-auto px-4">
+              <p>© 2026 DeltaStock Protocol. Delta-Neutral Yield on Tokenized Equities & RWAs.</p>
+            </div>
+          </footer>
+
+          {/* WALLET MODAL */}
+          {isWalletModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="w-full max-w-md bg-[#0B0E14] border border-slate-800 rounded-3xl p-6 relative space-y-4">
+                <button onClick={() => setIsWalletModalOpen(false)} className="absolute right-4 top-4 text-slate-400">✕</button>
+                <h3 className="text-xl font-bold text-white">{wallet.isConnected ? 'Connected Wallet' : 'Connect Wallet'}</h3>
+                
+                {wallet.isConnected ? (
+                  <div className="space-y-4 font-mono text-xs">
+                    <div className="p-3 bg-slate-950 rounded-xl">Address: {wallet.address}</div>
+                    <div className="p-3 bg-slate-950 rounded-xl text-[#00E676]">Balance: ${wallet.usdcBalance.toLocaleString()} USDC</div>
+                    <button onClick={handleDisconnect} className="w-full py-3 bg-rose-500/20 text-rose-400 font-bold rounded-xl">Disconnect</button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {['MetaMask', 'Phantom', 'Coinbase Wallet', 'WalletConnect'].map(name => (
+                      <button key={name} onClick={handleConnect} className="w-full p-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 text-left">
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* DEPOSIT MODAL */}
+          {isDepositModalOpen && selectedStrategy && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="w-full max-w-md bg-[#0B0E14] border border-slate-800 rounded-3xl p-6 relative space-y-4">
+                <button onClick={() => { setIsDepositModalOpen(false); setIsSuccess(false); }} className="absolute right-4 top-4 text-slate-400">✕</button>
+                
+                {isSuccess ? (
+                  <div className="text-center space-y-4 py-4">
+                    <div className="text-4xl">✅</div>
+                    <h3 className="text-xl font-bold text-white">Deposit Confirmed!</h3>
+                    <p className="text-xs text-slate-300">Successfully deposited ${depositInput} USDC into {selectedStrategy.name}.</p>
+                    <button onClick={() => { setIsDepositModalOpen(false); setIsSuccess(false); }} className="w-full py-3 bg-[#00E676] text-black font-bold rounded-xl">Done</button>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="text-xl font-bold text-white">Deposit into {selectedStrategy.assetSymbol}</h3>
+                    <div className="p-3 bg-slate-950 rounded-xl text-xs font-mono">
+                      <div>Net APY: <span className="text-[#00E676] font-bold">+{selectedStrategy.estApy}%</span></div>
+                      <div>Venue: {selectedStrategy.lpVenue}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-mono text-slate-400 block mb-1">Deposit USDC:</label>
+                      <input
+                        type="number" value={depositInput} onChange={(e) => setDepositInput(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-950 border border-slate-700 text-white font-mono font-bold rounded-xl"
+                      />
+                    </div>
+                    <button
+                      onClick={handleExecuteDeposit} disabled={isExecuting}
+                      className="w-full py-3.5 bg-[#00E676] text-black font-extrabold rounded-xl"
+                    >
+                      {isExecuting ? 'Executing Hedged Deposit...' : `Confirm Deposit $${depositInput} USDC`}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
