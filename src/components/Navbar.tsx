@@ -65,11 +65,23 @@ export const Navbar: React.FC<NavbarProps> = ({ wallet, onOpenWalletModal }) => 
         {/* Action Controls */}
         <div className="flex items-center space-x-3">
           
+          {/* Official X Account Link */}
+          <a
+            href="https://x.com/deltastock_/status/2087854976865542652?s=20"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 hover:text-[#00E676] hover:border-[#00E676]/40 transition-colors"
+          >
+            <span className="font-bold text-[#00E676]">𝕏</span>
+            <span>@deltastock_</span>
+          </a>
+
           {/* Audit Badge */}
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
             <Shield className="w-3.5 h-3.5 text-[#00E5FF]" />
             <span>Audited Smart Contracts</span>
           </div>
+
 
           {/* Connect Wallet Button */}
           <button
