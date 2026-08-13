@@ -52,16 +52,20 @@ export const Footer: React.FC = () => {
               50% of protocol performance fees are distributed weekly to $DSK governance token stakers.
             </p>
             <div className="flex space-x-3">
-              <a href="#" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-[#00E676] hover:border-[#00E676] transition-all">
+              <a 
+                href="https://x.com/deltastock_/status/2087854976865542652?s=20" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                title="Official X / Twitter @deltastock_"
+                className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-[#00E676] hover:border-[#00E676] transition-all"
+              >
                 <Twitter className="w-4 h-4" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-[#00E676] hover:border-[#00E676] transition-all">
-                <Discord className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-[#00E676] hover:border-[#00E676] transition-all">
+              <a href="https://github.com/raeesvsl1-png/deltastock-protocol" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-[#00E676] hover:border-[#00E676] transition-all">
                 <Github className="w-4 h-4" />
               </a>
             </div>
+
           </div>
 
         </div>
